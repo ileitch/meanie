@@ -26,7 +26,7 @@ void mne_git_cleanup() {
 void mne_git_load_blobs(const char *path) {
   mne_git_initialize();
 
-	printf("\nLoading blobs...\n\n");
+  printf("\nLoading blobs...\n\n");
   gettimeofday(&begin, NULL);
 
   git_repository_open(&repo, path);
@@ -56,12 +56,14 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
     assert((strlen(root) + strlen(git_tree_entry_name(entry))) < MNE_MAX_PATH_LENGTH);
 
     char *path = malloc(sizeof(char) * MNE_MAX_PATH_LENGTH);
+    assert(path != NULL);
     strcpy(path, root);
     strcat(path, git_tree_entry_name(entry));
 
     const git_oid *blob_oid = git_tree_entry_id(entry);
 
     char *sha1 = malloc(sizeof(char) * GIT_OID_HEXSZ+1);
+    assert(sha1 != NULL);
     git_oid_tostr(sha1, GIT_OID_HEXSZ+1, blob_oid);
 
     git_odb_object *blob_odb_object;
@@ -82,6 +84,7 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
       p->bytes += (unsigned long)(sizeof(char) * strlen(data));  
 
       sha1_refs = malloc(sizeof(char*) * p->total_refs);
+      assert(sha1_refs != NULL);
       int i;
       for (i = 0; i < p->total_refs; i++)
         sha1_refs[i] = NULL;
@@ -89,6 +92,7 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
       g_hash_table_insert(refs, (gpointer)sha1, (gpointer)sha1_refs);
     } else {
       sha1_refs = g_hash_table_lookup(refs, (gpointer)sha1);
+      git_odb_object_free(blob_odb_object);
     }
 
     int i;
@@ -149,6 +153,7 @@ static void mne_git_walk_tree(git_tree *tree, git_reference *ref, mne_git_walk_c
   context->distinct_blobs = 0;
   assert(strlen(git_reference_name(ref)) < MNE_MAX_REF_LENGTH);
   context->ref_name = malloc(sizeof(char) * MNE_MAX_REF_LENGTH);
+  assert(context->ref_name != NULL);
   strncpy(context->ref_name, git_reference_name(ref), MNE_MAX_REF_LENGTH);
 
   printf(" * %-22s", context->ref_name);

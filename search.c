@@ -2,6 +2,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <pcre.h>
+#include <assert.h>
 #include <sys/time.h>
 
 #include "util.h"
@@ -54,6 +55,7 @@ void mne_search_loop() {
     printf("regex: ");
     size_t term_bytes = 1024;
     getline(&term, &term_bytes, stdin);
+    term[strlen(term) - 1] = 0; // remove newline.
 
     if (strncmp(term, "exit", 4) == 0) {
       exiting = 1;
@@ -98,7 +100,9 @@ static void mne_search_initialize() {
   num_cores = mne_detect_logical_cores();
 
   threads = malloc(sizeof(pthread_t) * num_cores);
+  assert(threads != NULL);
   search_contexts = malloc(sizeof(mne_search_context) * num_cores);
+  assert(search_contexts != NULL);
   int z, num_blobs = g_hash_table_size(blobs);
 
   for (z = 0; z < num_cores; z++) {
@@ -115,8 +119,11 @@ static void mne_search_build_index() {
 
   int blob_count = g_hash_table_size(blobs);
   blob_index = malloc(sizeof(char*) * blob_count);
+  assert(blob_index != NULL);
   sha1_index = malloc(sizeof(char*) * blob_count);
+  assert(sha1_index != NULL);
   blob_sizes = malloc(sizeof(int) * blob_count);
+  assert(blob_sizes != NULL);
 
   g_hash_table_foreach(blobs, mne_search_index_iter, &conext);
   printf("✔\n");
@@ -136,9 +143,9 @@ static void mne_search_print_result(int index, int offset, int length) {
   int pad_left = 0, pad_right = 0;
 
   while (1) {
+    if (offset - pad_left <= 0)
+      break;    
     pad_left++;
-    if (offset - pad_left < 0)
-      break;
     if (pad_left == RESULT_PAD)
       break;
     if (blob_index[index][offset - pad_left] == '\n') {
@@ -148,18 +155,17 @@ static void mne_search_print_result(int index, int offset, int length) {
   }
 
   while (1) {
-    pad_right++;
     if (pad_right >= blob_sizes[index])
       break;
-    if (pad_right == RESULT_PAD)
-      break;
-    if (blob_index[index][offset + length + pad_right - 1] == '\n') {
-      pad_right--;
+    if (blob_index[index][offset + length + pad_right] == '\n') {
       break;
     }
+    pad_right++;
+    if (pad_right == RESULT_PAD)
+      break;
   }
 
-  mne_printf_async("%s\n%s:%d\n%.*s\033[1m%.*s\033[0m%.*s\n\n", sha1_index[index], path, offset, pad_left, blob_index[index] + offset - pad_left, length, blob_index[index] + offset, pad_right, blob_index[index] + offset + length);
+  mne_printf_async("%s\n%s:%d\n%.*s\033[1m%.*s\033[0m%.*s...\n\n", sha1_index[index], path, offset, pad_left, blob_index[index] + offset - pad_left, length, blob_index[index] + offset, pad_right, blob_index[index] + offset + length);
 }
 
 static void *mne_search(void *arg) {
@@ -181,7 +187,7 @@ static void *mne_search(void *arg) {
         mne_printf_async("Too many matches in blob %s\n", sha1_index[n]);
 
       for (i = 0; i < rc; ++i)
-        mne_search_print_result(n, matches[2*i], (matches[2*i+1] - matches[2*i]) - 1);
+        mne_search_print_result(n, matches[2*i], matches[2*i+1] - matches[2*i]);
     }
     
     pthread_mutex_lock(&done_incr_mutex);
