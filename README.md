@@ -6,6 +6,11 @@ A tool for searching Git repositories using regular expressions. It searches all
 
 It's currently a simple REPL based search, though I'll turn it into a daemon soon and add a MessagePack interface.
 
+### Coolness
+
+* Uses all logical cores during search, without use of locks.
+* Uses PCRE with its JIT enabled.
+
 ## Build
 
 `make`
