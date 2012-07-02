@@ -1,6 +1,6 @@
 # meanie
 
-A tool for searching Git repositories with regular expressions. It searches all blobs reachable from HEAD and tags.
+A tool for searching Git repositories using regular expressions. It searches all blobs reachable from HEAD and tags.
 
 It's currently a simple REPL based search, though I'll turn it into a daemon soon and add a MessagePack interface.
 
