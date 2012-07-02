@@ -1,5 +1,7 @@
 # meanie
 
+Note: this is very much a work in progress, it WILL kill kittens.
+
 A tool for searching Git repositories using regular expressions. It searches all blobs reachable from HEAD and tags.
 
 It's currently a simple REPL based search, though I'll turn it into a daemon soon and add a MessagePack interface.
