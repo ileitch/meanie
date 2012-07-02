@@ -16,9 +16,12 @@ GHashTable *refs;
 typedef struct {
 	char *ref_name;
 	unsigned long bytes;
-	unsigned int total_refs;
 	unsigned int distinct_blobs;
 } mne_git_walk_context;
+
+typedef struct {
+	int free_key;
+} mne_git_cleanup_ctx;
 
 void mne_git_cleanup();
 void mne_git_load_blobs(const char*);
