@@ -5,6 +5,7 @@
 #include <pthread.h>
 
 #include "util.h"
+#include "valgrind.h"
 
 static pthread_mutex_t printf_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -42,11 +43,15 @@ int mne_detect_logical_cores() {
   exit(1);
 #endif  
 
-  FILE *fd = popen(cmd, "r");
-  assert(fd != NULL);
-  char output[3];
-  fgets(output, 3, fd);
-  pclose(fd);
-  output[2] = 0;
-  return atoi(output);
+  if (!RUNNING_ON_VALGRIND) {
+    FILE *fd = popen(cmd, "r");
+    assert(fd != NULL);
+    char output[3];
+    fgets(output, 3, fd);
+    pclose(fd);
+    output[2] = 0;
+    return atoi(output);
+  } else {
+    return 2;
+  }
 }

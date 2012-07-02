@@ -4,8 +4,8 @@
 
 ## OSX
 
-`export DYLD_LIBRARY_PATH=/Users/ian/Projects/stripe/built/lib/`
+`export DYLD_LIBRARY_PATH=/Users/ian/Projects/ileitch/meanie/built/lib/`
 
 ## Linux
 
-`export LD_LIBRARY_PATH=/Users/ian/Projects/stripe/built/lib/`
+`export LD_LIBRARY_PATH=/Users/ian/Projects/ileitch/meanie/built/lib/`
