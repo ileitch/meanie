@@ -146,21 +146,28 @@ static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, co
 
   git_tag *tag;
   err = git_tag_lookup(&tag, repo, tag_oid);
-  mne_check_error("git_tag_lookup()", err, __FILE__, __LINE__);
+  const git_oid *tag_commit_oid;
 
-  git_object *tag_object;
-  err = git_tag_peel(&tag_object, tag);
-  mne_check_error("git_tag_peel()", err, __FILE__, __LINE__);
+  if (err == GIT_ENOTFOUND) {
+    // Not a tag, must be a commit.
+    tag_commit_oid = tag_oid;
+  } else {
+    mne_check_error("git_tag_lookup()", err, __FILE__, __LINE__);
 
-  const git_otype type = git_object_type(tag_object);
+    git_object *tag_object;
+    err = git_tag_peel(&tag_object, tag);
+    mne_check_error("git_tag_peel()", err, __FILE__, __LINE__);
 
-  if (type != GIT_OBJ_COMMIT)
-    return MNE_GIT_TARGET_NOT_COMMIT;
+    const git_otype type = git_object_type(tag_object);
 
-  const git_oid *tag_commit_oid = git_object_id(tag_object);
-  assert(tag_commit_oid != NULL);
+    if (type != GIT_OBJ_COMMIT)
+      return MNE_GIT_TARGET_NOT_COMMIT;
 
-  git_object_free(tag_object);
+    tag_commit_oid = git_object_id(tag_object);
+    assert(tag_commit_oid != NULL);
+
+    git_object_free(tag_object);
+  }
 
   git_commit *tag_commit;
   err = git_commit_lookup(&tag_commit, repo, tag_commit_oid);
