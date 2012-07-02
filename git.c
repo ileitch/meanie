@@ -60,9 +60,7 @@ void mne_git_load_blobs(const char *path) {
   mne_git_walk_head(&context);
   mne_git_walk_tags(&context, &tag_names);
 
-  // TODO: Free tag_names???
-  // If we free them here, probs need to copy to string passed to mne_git_get_tag_tree.
-
+  git_strarray_free(&tag_names);
   git_repository_free(repo);
   git_odb_free(odb);
 

@@ -60,6 +60,7 @@ void mne_search_loop() {
     if (strncmp(term, "exit", 4) == 0) {
       exiting = 1;
       mne_search_ready();
+      free(term);
       break;
     }
 
@@ -67,6 +68,7 @@ void mne_search_loop() {
 
     if (re == NULL) {
        printf("Regex compilation failed at offset %d: %s\n", erroffset, error);
+       free(term);
        continue;
      }
 
@@ -76,12 +78,12 @@ void mne_search_loop() {
       printf("pcre_study() failed: %s\n", error);
       pcre_free_study(re_extra);
       re_extra = NULL;
+      pcre_free(re);
+      free(term);
       continue;
     }
    
     printf("\n");
-    free(term);
-    term = NULL;
     gettimeofday(&begin, NULL);
     threads_complete = 0;
     pthread_mutex_unlock(&all_done_mutex);
@@ -92,6 +94,12 @@ void mne_search_loop() {
     printf("Done, ");
     mne_print_duration(&end, &begin);
     printf(".\n");
+
+    free(term);
+    term = NULL;
+    pcre_free(re);
+    if (re_extra != NULL)
+      pcre_free_study(re_extra);
   }
 }
 

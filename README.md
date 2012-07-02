@@ -31,3 +31,8 @@ It's currently a simple REPL based search, though I'll turn it into a daemon soo
 * Communicate using MessagePack.
 * Walk branches also.
 * Restrict search to specific ref.
+
+
+## Brain Dump
+
+* Currently memory is allocated on a per-blob basis. These blobs may be scattered about in main memory, inhibiting the CPUs ability to pipeline the blobs. Another approach is to allocate blobs in a contiguous fashion, a Big Blob™. A seperate data structure will hold the begin/end offsets of individual blobs. 
