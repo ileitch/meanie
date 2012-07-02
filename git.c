@@ -19,8 +19,7 @@ static int mne_git_get_tag_tree(git_tree**, git_reference**, const char*);
 static void mne_git_walk_tree(git_tree*, git_reference*, mne_git_walk_context*);
 
 void mne_git_cleanup() {
-  git_repository_free(repo);
-  git_odb_free(odb);
+
 }
 
 void mne_git_load_blobs(const char *path) {
@@ -38,6 +37,9 @@ void mne_git_load_blobs(const char *path) {
 
   mne_git_walk_head(&context);
   mne_git_walk_tags(&context);
+
+  git_repository_free(repo);
+  git_odb_free(odb);
 
   gettimeofday(&end, NULL);
 
@@ -75,7 +77,9 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
 
     if (blob == NULL) {
       p->distinct_blobs++;
-      char *data = (char *)git_odb_object_data(blob_odb_object);
+      char *tmp_data = (char*)git_odb_object_data(blob_odb_object);
+      char *data = malloc(sizeof(char) * strlen(tmp_data));
+      memcpy(data, tmp_data, strlen(tmp_data));
 
       // TOOD: Check that the blob <-> path mapping is 1-1.
       g_hash_table_insert(paths, (gpointer)sha1, (gpointer)path);
@@ -92,8 +96,9 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
       g_hash_table_insert(refs, (gpointer)sha1, (gpointer)sha1_refs);
     } else {
       sha1_refs = g_hash_table_lookup(refs, (gpointer)sha1);
-      git_odb_object_free(blob_odb_object);
     }
+
+    git_odb_object_free(blob_odb_object);
 
     int i;
     for (i = 0; i < p->total_refs; i++) {
