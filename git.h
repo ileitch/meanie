@@ -4,7 +4,6 @@
 #include <glib.h>
 #include <git2.h>
 
-#define MNE_MAX_REF_LENGTH 22
 #define MNE_MAX_PATH_LENGTH 256
 #define MNE_GIT_TARGET_NOT_COMMIT -1
 #define MNE_GIT_OK 0

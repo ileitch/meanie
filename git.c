@@ -68,7 +68,7 @@ void mne_git_load_blobs(const char *path) {
 
   int total_blobs = g_hash_table_size(blobs);
   float mb = context.bytes / 1048576.0;
-  printf("Loaded %d blobs (%.2fmb) ", total_blobs, mb);
+  printf("\nLoaded %d blobs (%.2fmb) ", total_blobs, mb);
   mne_print_duration(&end, &begin);
   printf(".\n");
 }
@@ -176,18 +176,20 @@ static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, co
 
 static void mne_git_walk_tree(git_tree *tree, git_reference *ref, mne_git_walk_context *context) {
   context->distinct_blobs = 0;
-  assert(strlen(git_reference_name(ref)) < MNE_MAX_REF_LENGTH);
-  context->ref_name = malloc(sizeof(char) * MNE_MAX_REF_LENGTH);
+  // assert(strlen(git_reference_name(ref)) < MNE_MAX_REF_LENGTH);
+  int ref_name_len = strlen(git_reference_name(ref));
+  context->ref_name = malloc(sizeof(char) * (ref_name_len + 1));
   ref_names[total_refs] = context->ref_name;
   assert(context->ref_name != NULL);
-  strncpy(context->ref_name, git_reference_name(ref), MNE_MAX_REF_LENGTH);
+  strncpy(context->ref_name, git_reference_name(ref), ref_name_len);
+  context->ref_name[ref_name_len] = 0;
 
   total_refs++;
 
   printf(" * %-22s", context->ref_name);
   fflush(stdout);
   git_tree_walk(tree, &mne_git_tree_entry_cb, GIT_TREEWALK_POST, context);
-  printf("✔ +%d\n", context->distinct_blobs);
+  printf(" ✔ +%d\n", context->distinct_blobs);
 }
 
 static void mne_git_initialize() {

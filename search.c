@@ -134,7 +134,7 @@ static void mne_search_build_index() {
   assert(blob_sizes != NULL);
 
   g_hash_table_foreach(blobs, mne_search_index_iter, &conext);
-  printf("✔\n");
+  printf(" ✔\n");
 }
 
 static void mne_search_index_iter(gpointer key, gpointer value, gpointer user_data) {
