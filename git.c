@@ -78,8 +78,10 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
     if (blob == NULL) {
       p->distinct_blobs++;
       char *tmp_data = (char*)git_odb_object_data(blob_odb_object);
-      char *data = malloc(sizeof(char) * strlen(tmp_data));
-      memcpy(data, tmp_data, strlen(tmp_data));
+      int data_len = strlen(tmp_data);
+      char *data = malloc(sizeof(char) * data_len+1);
+      memcpy(data, tmp_data, data_len);
+      data[data_len] = 0;
 
       // TOOD: Check that the blob <-> path mapping is 1-1.
       g_hash_table_insert(paths, (gpointer)sha1, (gpointer)path);
