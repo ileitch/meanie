@@ -1,4 +1,4 @@
-### meanie
+# meanie
 
 A tool for searching Git repositories with regular expressions. It searches all blobs reachable from HEAD and tags.
 
