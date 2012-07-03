@@ -53,16 +53,17 @@ void mne_git_load_blobs(const char *path) {
   git_strarray tag_names;
   git_tag_list(&tag_names, repo);
 
+  total_refs = tag_names.count + 1; // + 1 for HEAD.
   mne_git_walk_context context;
   context.bytes = 0;
-  ref_names = malloc(sizeof(char*) * (tag_names.count + 1)); // + 1 for HEAD. 
+  context.ref_index = 0;
+  ref_names = malloc(sizeof(char*) * total_refs);
 
   mne_git_walk_head(&context);
   mne_git_walk_tags(&context, &tag_names);
 
   git_strarray_free(&tag_names);
   git_repository_free(repo);
-  git_odb_free(odb);
 
   gettimeofday(&end, NULL);
 
@@ -108,7 +109,7 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
       g_hash_table_insert(paths, (gpointer)sha1, (gpointer)path);
       g_hash_table_insert(blobs, (gpointer)sha1, (gpointer)data);
 
-      p->bytes += (unsigned long)(sizeof(char) * strlen(data));  
+      p->bytes += (unsigned long)(sizeof(char) * strlen(data));
 
       sha1_refs = malloc(sizeof(char*) * total_refs);
       assert(sha1_refs != NULL);
@@ -152,11 +153,11 @@ static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, co
     // Not a tag, must be a commit.
     tag_commit_oid = tag_oid;
   } else {
-    mne_check_error("git_tag_lookup()", err, __FILE__, __LINE__);
-
     git_object *tag_object;
     err = git_tag_peel(&tag_object, tag);
     mne_check_error("git_tag_peel()", err, __FILE__, __LINE__);
+
+    git_tag_free(tag);
 
     const git_otype type = git_object_type(tag_object);
 
@@ -183,15 +184,12 @@ static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, co
 
 static void mne_git_walk_tree(git_tree *tree, git_reference *ref, mne_git_walk_context *context) {
   context->distinct_blobs = 0;
-  // assert(strlen(git_reference_name(ref)) < MNE_MAX_REF_LENGTH);
   int ref_name_len = strlen(git_reference_name(ref));
   context->ref_name = malloc(sizeof(char) * (ref_name_len + 1));
-  ref_names[total_refs] = context->ref_name;
+  ref_names[context->ref_index] = context->ref_name;
   assert(context->ref_name != NULL);
   strncpy(context->ref_name, git_reference_name(ref), ref_name_len);
   context->ref_name[ref_name_len] = 0;
-
-  total_refs++;
 
   printf(" * %-22s", context->ref_name);
   fflush(stdout);
@@ -242,6 +240,7 @@ static void mne_git_walk_tags(mne_git_walk_context *context, git_strarray *tag_n
       continue;
     }
 
+    context->ref_index++;
     mne_git_walk_tree(tag_tree, tag_ref, context);
     git_tree_free(tag_tree);
     git_reference_free(tag_ref);

@@ -16,6 +16,7 @@ typedef struct {
 	char *ref_name;
 	unsigned long bytes;
 	unsigned int distinct_blobs;
+	unsigned int ref_index;
 } mne_git_walk_context;
 
 typedef struct {
