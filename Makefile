@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 PREFIX_DIR = $(PWD)/built
 PCRE_DIR = $(PWD)/vendor/pcre-8.30
-LIBGIT2_DIR = $(PWD)/vendor/libgit2-0.17.0
+LIBGIT2_DIR = $(PWD)/vendor/libgit2
 FILES = util.c git.c search.c main.c
 
 all: pcre libgit2 meanie
