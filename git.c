@@ -14,16 +14,17 @@ static struct timeval begin, end;
 static char **ref_names;
 
 static void mne_git_initialize();
-static void mne_git_walk_head(mne_git_walk_context*);
-static void mne_git_walk_tags(mne_git_walk_context*, git_strarray*);
+static void mne_git_walk_head(mne_git_walk_ctx*);
+static void mne_git_cleanup_iter(gpointer, gpointer, gpointer);
+static void mne_git_walk_tags(mne_git_walk_ctx*, git_strarray*);
+static int mne_git_get_tag_commit_oid(const git_oid**, git_tag*);
 static int mne_git_tree_entry_cb(const char*, git_tree_entry*, void*);
 static int mne_git_get_tag_tree(git_tree**, git_reference**, const char*);
-static void mne_git_walk_tree(git_tree*, git_reference*, mne_git_walk_context*);
-static void mne_git_cleanup_iter(gpointer, gpointer, gpointer);
+static void mne_git_walk_tree(git_tree*, git_reference*, mne_git_walk_ctx*);
 
 void mne_git_cleanup() {
   mne_git_cleanup_ctx ctx;
-  // The same sha1 strings are used as keys for all hashes.
+  /* The same sha1 strings are used as keys for all hashes. */
   ctx.free_key = 1;
   g_hash_table_foreach(blobs, mne_git_cleanup_iter, &ctx);
   ctx.free_key = 0;
@@ -53,36 +54,36 @@ void mne_git_load_blobs(const char *path) {
   git_strarray tag_names;
   git_tag_list(&tag_names, repo);
 
-  total_refs = tag_names.count + 1; // + 1 for HEAD.
-  mne_git_walk_context context;
-  context.bytes = 0;
-  context.ref_index = 0;
+  total_refs = tag_names.count + 1; /* + 1 for HEAD. */
   ref_names = malloc(sizeof(char*) * total_refs);
 
-  mne_git_walk_head(&context);
-  mne_git_walk_tags(&context, &tag_names);
+  mne_git_walk_ctx ctx;
+  ctx.bytes = 0;
+  ctx.ref_index = 0;
+  
+  mne_git_walk_head(&ctx);
+  mne_git_walk_tags(&ctx, &tag_names);
 
   git_strarray_free(&tag_names);
   git_repository_free(repo);
 
   gettimeofday(&end, NULL);
 
-  int total_blobs = g_hash_table_size(blobs);
-  float mb = context.bytes / 1048576.0;
-  printf("\nLoaded %d blobs (%.2fmb) ", total_blobs, mb);
+  float mb = ctx.bytes / 1048576.0;
+  printf("\nLoaded %d blobs (%.2fmb) ", g_hash_table_size(blobs), mb);
   mne_print_duration(&end, &begin);
   printf(".\n");
 }
 
 static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *arg) {
-  mne_git_walk_context *p = (mne_git_walk_context*)arg;
+  mne_git_walk_ctx *ctx = (mne_git_walk_ctx*)arg;
   git_otype type = git_tree_entry_type(entry);
   
   if (type == GIT_OBJ_BLOB) {
     const git_oid *blob_oid = git_tree_entry_id(entry);
-    char *sha1 = malloc(sizeof(char) * GIT_OID_HEXSZ+1);
+    char *sha1 = malloc(sizeof(char) * GIT_OID_HEXSZ + 1);
     assert(sha1 != NULL);
-    git_oid_tostr(sha1, GIT_OID_HEXSZ+1, blob_oid);
+    git_oid_tostr(sha1, GIT_OID_HEXSZ + 1, blob_oid);
 
     git_odb_object *blob_odb_object;
     git_odb_read(&blob_odb_object, odb, blob_oid);
@@ -92,10 +93,10 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
     char **sha1_refs;
 
     if (blob == NULL) {
-      p->distinct_blobs++;
+      ctx->distinct_blobs++;
       char *tmp_data = (char*)git_odb_object_data(blob_odb_object);
       int data_len = strlen(tmp_data);
-      char *data = malloc(sizeof(char) * data_len+1);
+      char *data = malloc(sizeof(char) * (data_len + 1));
       memcpy(data, tmp_data, data_len);
       data[data_len] = 0;
 
@@ -105,14 +106,15 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
       strcpy(path, root);
       strcat(path, git_tree_entry_name(entry));
 
-      // TOOD: Check that the blob <-> path mapping is 1-1.
+      /* TOOD: Check that the blob <-> path mapping is 1-1. */
       g_hash_table_insert(paths, (gpointer)sha1, (gpointer)path);
       g_hash_table_insert(blobs, (gpointer)sha1, (gpointer)data);
 
-      p->bytes += (unsigned long)(sizeof(char) * strlen(data));
+      ctx->bytes += (unsigned long)(sizeof(char) * strlen(data));
 
       sha1_refs = malloc(sizeof(char*) * total_refs);
       assert(sha1_refs != NULL);
+
       int i;
       for (i = 0; i < total_refs; i++)
         sha1_refs[i] = NULL;
@@ -130,12 +132,30 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
       if (sha1_refs[i] != NULL)
         continue;
 
-      sha1_refs[i] = p->ref_name;
+      sha1_refs[i] = ctx->ref_name;
       break;
     }
   }
 
   return GIT_OK;
+}
+
+static int mne_git_get_tag_commit_oid(const git_oid **tag_commit_oid, git_tag* tag) {
+  git_object *tag_object;
+  int err = git_tag_peel(&tag_object, tag);
+  mne_check_error("git_tag_peel()", err, __FILE__, __LINE__);
+
+  const git_otype type = git_object_type(tag_object);
+
+  if (type != GIT_OBJ_COMMIT)
+    return MNE_GIT_TARGET_NOT_COMMIT;
+
+  *tag_commit_oid = git_object_id(tag_object);
+  assert(tag_commit_oid != NULL);
+
+  git_object_free(tag_object);
+
+  return MNE_GIT_OK;
 }
 
 static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, const char *ref_name) {
@@ -150,24 +170,13 @@ static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, co
   const git_oid *tag_commit_oid;
 
   if (err == GIT_ENOTFOUND) {
-    // Not a tag, must be a commit.
+    /* Not a tag, must be a commit. */
     tag_commit_oid = tag_oid;
   } else {
-    git_object *tag_object;
-    err = git_tag_peel(&tag_object, tag);
-    mne_check_error("git_tag_peel()", err, __FILE__, __LINE__);
-
+    err = mne_git_get_tag_commit_oid(&tag_commit_oid, tag);
     git_tag_free(tag);
-
-    const git_otype type = git_object_type(tag_object);
-
-    if (type != GIT_OBJ_COMMIT)
-      return MNE_GIT_TARGET_NOT_COMMIT;
-
-    tag_commit_oid = git_object_id(tag_object);
-    assert(tag_commit_oid != NULL);
-
-    git_object_free(tag_object);
+    if (err != GIT_OK)
+      return err;
   }
 
   git_commit *tag_commit;
@@ -182,19 +191,21 @@ static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, co
   return MNE_GIT_OK;
 }
 
-static void mne_git_walk_tree(git_tree *tree, git_reference *ref, mne_git_walk_context *context) {
-  context->distinct_blobs = 0;
-  int ref_name_len = strlen(git_reference_name(ref));
-  context->ref_name = malloc(sizeof(char) * (ref_name_len + 1));
-  ref_names[context->ref_index] = context->ref_name;
-  assert(context->ref_name != NULL);
-  strncpy(context->ref_name, git_reference_name(ref), ref_name_len);
-  context->ref_name[ref_name_len] = 0;
+static void mne_git_walk_tree(git_tree *tree, git_reference *ref, mne_git_walk_ctx *ctx) {
+  ctx->distinct_blobs = 0;
 
-  printf(" * %-22s", context->ref_name);
+  int ref_name_len = strlen(git_reference_name(ref));
+  ctx->ref_name = malloc(sizeof(char) * (ref_name_len + 1));
+  assert(ctx->ref_name != NULL);
+  strncpy(ctx->ref_name, git_reference_name(ref), ref_name_len);
+  ctx->ref_name[ref_name_len] = 0;
+
+  ref_names[ctx->ref_index] = ctx->ref_name;
+
+  printf(" * %-22s", ctx->ref_name);
   fflush(stdout);
-  git_tree_walk(tree, &mne_git_tree_entry_cb, GIT_TREEWALK_POST, context);
-  printf(" ✔ +%d\n", context->distinct_blobs);
+  git_tree_walk(tree, &mne_git_tree_entry_cb, GIT_TREEWALK_POST, ctx);
+  printf(" ✔ +%d\n", ctx->distinct_blobs);
 }
 
 static void mne_git_initialize() {
@@ -204,14 +215,11 @@ static void mne_git_initialize() {
   refs = g_hash_table_new(g_str_hash, g_str_equal);  
 }
 
-static void mne_git_walk_head(mne_git_walk_context *context) {
+static void mne_git_walk_head(mne_git_walk_ctx *ctx) {
   git_reference *head_ref;
-  int err = git_repository_head(&head_ref, repo);
 
-  if (err != 0) {
-    printf("git_repository_head() returned %d", err);
-    exit(1);
-  }
+  int err = git_repository_head(&head_ref, repo);
+  mne_check_error("git_repository_head()", err, __FILE__, __LINE__);
 
   const git_oid *head_oid = git_reference_oid(head_ref);
 
@@ -222,26 +230,25 @@ static void mne_git_walk_head(mne_git_walk_context *context) {
   git_commit_tree(&head_tree, head_commit);
   git_commit_free(head_commit);
 
-  mne_git_walk_tree(head_tree, head_ref, context);
+  mne_git_walk_tree(head_tree, head_ref, ctx);
 
   git_tree_free(head_tree);
   git_reference_free(head_ref);
 }
 
-static void mne_git_walk_tags(mne_git_walk_context *context, git_strarray *tag_names) {
+static void mne_git_walk_tags(mne_git_walk_ctx *ctx, git_strarray *tag_names) {
   int i, err;
   for (i = 0; i < tag_names->count; i++) {
     git_tree *tag_tree;
     git_reference *tag_ref;
 
-    err = mne_git_get_tag_tree(&tag_tree, &tag_ref, tag_names->strings[i]);
-    if (err == MNE_GIT_TARGET_NOT_COMMIT) {
+    if ((err = mne_git_get_tag_tree(&tag_tree, &tag_ref, tag_names->strings[i])) == MNE_GIT_TARGET_NOT_COMMIT) {
       printf(" ! %s does not target a commit? Skipping.\n", git_reference_name(tag_ref));
       continue;
     }
 
-    context->ref_index++;
-    mne_git_walk_tree(tag_tree, tag_ref, context);
+    ctx->ref_index++;
+    mne_git_walk_tree(tag_tree, tag_ref, ctx);
     git_tree_free(tag_tree);
     git_reference_free(tag_ref);
   }
@@ -249,6 +256,7 @@ static void mne_git_walk_tags(mne_git_walk_context *context, git_strarray *tag_n
 
 static void mne_git_cleanup_iter(gpointer key, gpointer value, gpointer args) {
   mne_git_cleanup_ctx *ctx = (mne_git_cleanup_ctx*)args;
+
   if (ctx->free_key)
     free(key);
 

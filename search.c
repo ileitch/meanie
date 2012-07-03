@@ -17,10 +17,10 @@ static pthread_mutex_t all_done_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int num_cores;
 static struct timeval begin, end;
-static mne_search_context *search_contexts;
+static mne_search_ctx *search_contexts;
 static volatile int exiting = 0, threads_complete = 0;
-static pcre *re = NULL; // TODO: volatile?
-static pcre_extra *re_extra = NULL; // TODO: volatile?
+static pcre *re = NULL; /* TODO: volatile? */
+static pcre_extra *re_extra = NULL; /* TODO: volatile? */
 static int *blob_sizes;
 static char **sha1_index, **blob_index;
 
@@ -44,18 +44,18 @@ void mne_search_cleanup() {
 }
 
 void mne_search_loop() {
-  mne_search_initialize();
-
-  printf("\nType 'exit' to... you know what.\n");
   char *term = NULL;
   const char *error;
   int erroffset;
+
+  mne_search_initialize();
+  printf("\nType 'exit' to... you know what.\n");
 
   while (1) {
     printf("regex: ");
     size_t term_bytes = 1024;
     getline(&term, &term_bytes, stdin);
-    term[strlen(term) - 1] = 0; // remove newline.
+    term[strlen(term) - 1] = 0; /* Remove newline. */
 
     if (strncmp(term, "exit", 4) == 0) {
       exiting = 1;
@@ -109,7 +109,7 @@ static void mne_search_initialize() {
 
   threads = malloc(sizeof(pthread_t) * num_cores);
   assert(threads != NULL);
-  search_contexts = malloc(sizeof(mne_search_context) * num_cores);
+  search_contexts = malloc(sizeof(mne_search_ctx) * num_cores);
   assert(search_contexts != NULL);
   int z, num_blobs = g_hash_table_size(blobs);
 
@@ -122,8 +122,8 @@ static void mne_search_initialize() {
 
 static void mne_search_build_index() {
   printf("\nBuilding search index... ");
-  mne_indices_context conext;
-  conext.offset = 0;
+  mne_indices_ctx ctx;
+  ctx.offset = 0;
 
   int blob_count = g_hash_table_size(blobs);
   blob_index = malloc(sizeof(char*) * blob_count);
@@ -133,16 +133,16 @@ static void mne_search_build_index() {
   blob_sizes = malloc(sizeof(int) * blob_count);
   assert(blob_sizes != NULL);
 
-  g_hash_table_foreach(blobs, mne_search_index_iter, &conext);
+  g_hash_table_foreach(blobs, mne_search_index_iter, &ctx);
   printf(" ✔\n");
 }
 
 static void mne_search_index_iter(gpointer key, gpointer value, gpointer user_data) {
-  mne_indices_context *conext = (mne_indices_context *)user_data;
-  sha1_index[conext->offset] = (char*)key;
-  blob_index[conext->offset] = (char*)value;
-  blob_sizes[conext->offset] = strlen((char*)value);
-  conext->offset++;
+  mne_indices_ctx *ctx = (mne_indices_ctx *)user_data;
+  sha1_index[ctx->offset] = (char*)key;
+  blob_index[ctx->offset] = (char*)value;
+  blob_sizes[ctx->offset] = strlen((char*)value);
+  ctx->offset++;
 }
 
 static void mne_search_print_result(int index, int offset, int length) {
@@ -178,7 +178,7 @@ static void mne_search_print_result(int index, int offset, int length) {
 
 static void *mne_search(void *arg) {
   int rc, i, n = 0, matches[MAX_MATCHES_PER_BLOB];
-  mne_search_context *conext = (mne_search_context *)arg;
+  mne_search_ctx *ctx = (mne_search_ctx *)arg;
 
   while (1) {
     pthread_mutex_lock(&search_mutex);
@@ -188,7 +188,7 @@ static void *mne_search(void *arg) {
     if (exiting)
       break;
 
-    for (n = conext->initial; n < conext->num_blobs; n += num_cores) {
+    for (n = ctx->initial; n < ctx->num_blobs; n += num_cores) {
       rc = pcre_exec(re, re_extra, blob_index[n], blob_sizes[n], 0, 0, matches, MAX_MATCHES_PER_BLOB);
 
       if (rc == 0)

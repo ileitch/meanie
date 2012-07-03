@@ -6,11 +6,11 @@
 typedef struct {
 	unsigned int initial;
 	unsigned int num_blobs;
-} mne_search_context;
+} mne_search_ctx;
 
 typedef struct {
 	unsigned int offset;
-} mne_indices_context;
+} mne_indices_ctx;
 
 void mne_search_loop();
 void mne_search_cleanup();

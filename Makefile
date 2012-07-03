@@ -10,7 +10,7 @@ clean: clean_pcre clean_libgit2 clean_meanie
 	rm -rf $(PREFIX_DIR)
 
 meanie: clean_meanie
-	gcc `pkg-config --libs --cflags glib-2.0` -L$(PREFIX_DIR)/lib -I$(PWD)/valgrind -I$(PREFIX_DIR)/include -Wall -O0 -g $(FILES) -lgit2 -lpcre -lpthread -o meanie
+	gcc `pkg-config --libs --cflags glib-2.0` -L$(PREFIX_DIR)/lib -I$(PWD)/valgrind -I$(PREFIX_DIR)/include -Wall -O3 -g $(FILES) -lgit2 -lpcre -lpthread -o meanie
 
 clean_meanie:
 	rm -f ./*.o

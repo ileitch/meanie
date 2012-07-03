@@ -17,7 +17,7 @@ typedef struct {
 	unsigned long bytes;
 	unsigned int distinct_blobs;
 	unsigned int ref_index;
-} mne_git_walk_context;
+} mne_git_walk_ctx;
 
 typedef struct {
 	int free_key;
