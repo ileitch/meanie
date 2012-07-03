@@ -57,10 +57,17 @@ void mne_search_loop() {
     getline(&term, &term_bytes, stdin);
     term[strlen(term) - 1] = 0; /* Remove newline. */
 
+    if (strlen(term) == 0) {
+      free(term);
+      term = NULL;
+      continue;
+    }
+
     if (strncmp(term, "exit", 4) == 0) {
       exiting = 1;
       mne_search_ready();
       free(term);
+      term = NULL;
       break;
     }
 
@@ -69,6 +76,7 @@ void mne_search_loop() {
     if (re == NULL) {
        printf("Regex compilation failed at offset %d: %s\n", erroffset, error);
        free(term);
+       term = NULL;
        continue;
      }
 
@@ -80,6 +88,7 @@ void mne_search_loop() {
       re_extra = NULL;
       pcre_free(re);
       free(term);
+      term = NULL;
       continue;
     }
    
