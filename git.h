@@ -8,6 +8,8 @@
 #define MNE_GIT_TARGET_NOT_COMMIT -1
 #define MNE_GIT_OK 0
 
+unsigned int total_refs;
+
 GHashTable *blobs;
 GHashTable *paths;
 GHashTable *refs;

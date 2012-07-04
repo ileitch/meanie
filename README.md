@@ -18,12 +18,18 @@ It's currently a simple REPL based search, though I'll turn it into a daemon soo
 ## OSX
 
 `export DYLD_LIBRARY_PATH=/path/to/meanie/built/lib/`
+
 `./meanie path/to/git/repo`
 
 ## Linux
 
 `export LD_LIBRARY_PATH=/path/to/meanie/built/lib/`
+
 `./meanie path/to/git/repo`
+
+### Ubuntu
+
+`apt-get install build-essential git-core pkg-config libglib2.0 cmake`
 
 ## Ideas
 

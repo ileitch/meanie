@@ -9,7 +9,6 @@
 static git_odb *odb;
 static git_repository *repo;
 
-static int total_refs;
 static struct timeval begin, end;
 static char **ref_names;
 

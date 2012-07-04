@@ -2,6 +2,7 @@
 
 #define RESULT_PAD 20
 #define MAX_MATCHES_PER_BLOB 30
+#define MAX_SEARCH_RESULTS_PER_THREAD 1000
 
 typedef struct {
 	unsigned int initial;
@@ -11,6 +12,13 @@ typedef struct {
 typedef struct {
 	unsigned int offset;
 } mne_indices_ctx;
+
+typedef struct {
+	unsigned int fresh;
+	unsigned int sha1_offset;
+	unsigned int offset;
+	unsigned int length;
+} mne_search_result;
 
 void mne_search_loop();
 void mne_search_cleanup();
