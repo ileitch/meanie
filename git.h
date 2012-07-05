@@ -8,16 +8,23 @@
 #define MNE_GIT_TARGET_NOT_COMMIT -1
 #define MNE_GIT_OK 0
 
+unsigned int total_blobs;
 unsigned int total_refs;
+char *data;
+size_t data_size;
 
-GHashTable *blobs;
-GHashTable *paths;
+GHashTable *paths; /* TODO: Needs a beter name. */
 GHashTable *refs;
 
 typedef struct {
+	unsigned long offset;
+	unsigned long length;
+} mne_git_blob_position;
+
+mne_git_blob_position *blob_index;
+
+typedef struct {
 	char *ref_name;
-	unsigned long bytes;
-	unsigned int distinct_blobs;
 	unsigned int ref_index;
 } mne_git_walk_ctx;
 

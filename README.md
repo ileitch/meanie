@@ -1,15 +1,14 @@
 # meanie
 
-Note: this is very much a work in progress, it WILL kill kittens.
-
 A tool for searching Git repositories using regular expressions. It searches all blobs reachable from HEAD and tags.
 
 It's currently a simple REPL based search, though I'll turn it into a daemon soon and add a MessagePack interface.
 
 ### Coolness
 
-* Uses all logical cores during search, without use of locks.
-* Uses PCRE with its JIT enabled.
+* FAST.
+* Uses all logical cores during search, without use of locks or CAS (compare-and-swap).
+* Uses PCRE with JIT enabled.
 
 ## Build
 
@@ -37,7 +36,6 @@ It's currently a simple REPL based search, though I'll turn it into a daemon soo
 * Communicate using MessagePack.
 * Walk branches also.
 * Restrict search to specific ref.
-
 
 ## Brain Dump
 

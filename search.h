@@ -1,12 +1,12 @@
 #include <glib.h>
 
+#include "git.h"
+
 #define RESULT_PAD 20
-#define MAX_MATCHES_PER_BLOB 30
 #define MAX_SEARCH_RESULTS_PER_THREAD 1000
 
 typedef struct {
-	unsigned int initial;
-	unsigned int num_blobs;
+	unsigned int id;
 } mne_search_ctx;
 
 typedef struct {
@@ -19,6 +19,11 @@ typedef struct {
 	unsigned int offset;
 	unsigned int length;
 } mne_search_result;
+
+typedef struct {
+	mne_git_blob_position *begin;
+	mne_git_blob_position *end;
+} mne_search_window;
 
 void mne_search_loop();
 void mne_search_cleanup();

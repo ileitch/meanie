@@ -25,9 +25,8 @@ void mne_git_cleanup() {
   mne_git_cleanup_ctx ctx;
   /* The same sha1 strings are used as keys for all hashes. */
   ctx.free_key = 1;
-  g_hash_table_foreach(blobs, mne_git_cleanup_iter, &ctx);
-  ctx.free_key = 0;
   g_hash_table_foreach(paths, mne_git_cleanup_iter, &ctx);
+  ctx.free_key = 0;
   g_hash_table_foreach(refs, mne_git_cleanup_iter, &ctx);
 
   int i;
@@ -35,8 +34,8 @@ void mne_git_cleanup() {
     free(ref_names[i]);
 
   free(ref_names);
+  free(data);
 
-  g_hash_table_destroy(blobs);
   g_hash_table_destroy(paths);
   g_hash_table_destroy(refs);
 }
@@ -57,9 +56,8 @@ void mne_git_load_blobs(const char *path) {
   ref_names = malloc(sizeof(char*) * total_refs);
 
   mne_git_walk_ctx ctx;
-  ctx.bytes = 0;
   ctx.ref_index = 0;
-  
+
   mne_git_walk_head(&ctx);
   mne_git_walk_tags(&ctx, &tag_names);
 
@@ -68,8 +66,8 @@ void mne_git_load_blobs(const char *path) {
 
   gettimeofday(&end, NULL);
 
-  float mb = ctx.bytes / 1048576.0;
-  printf("\nLoaded %d blobs (%.2fmb) ", g_hash_table_size(blobs), mb);
+  float mb = data_size / 1048576.0;
+  printf("\nLoaded %d blobs (%.2fmb) ", g_hash_table_size(paths), mb);
   mne_print_duration(&end, &begin);
   printf(".\n");
 }
@@ -87,17 +85,23 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
     git_odb_object *blob_odb_object;
     git_odb_read(&blob_odb_object, odb, blob_oid);
 
-    gpointer blob = g_hash_table_lookup(blobs, (gpointer)sha1);
-
     char **sha1_refs;
 
-    if (blob == NULL) {
-      ctx->distinct_blobs++;
-      char *tmp_data = (char*)git_odb_object_data(blob_odb_object);
-      int data_len = strlen(tmp_data);
-      char *data = malloc(sizeof(char) * (data_len + 1));
-      memcpy(data, tmp_data, data_len);
-      data[data_len] = 0;
+    if (!g_hash_table_contains(paths, (gpointer)sha1)) {
+      total_blobs++;
+
+      size_t blob_size = git_odb_object_size(blob_odb_object);
+      data = realloc(data, data_size + blob_size);
+      assert(data != NULL);
+      memcpy(data + data_size, git_odb_object_data(blob_odb_object), blob_size);
+      
+      blob_index = realloc(blob_index, sizeof(mne_git_blob_position) * total_blobs);
+      assert(blob_index != NULL);
+
+      blob_index[total_blobs-1].offset = data_size;
+      blob_index[total_blobs-1].length = blob_size;
+
+      data_size += blob_size;
 
       assert((strlen(root) + strlen(git_tree_entry_name(entry))) < MNE_MAX_PATH_LENGTH);
       char *path = malloc(sizeof(char) * MNE_MAX_PATH_LENGTH);
@@ -105,11 +109,7 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
       strcpy(path, root);
       strcat(path, git_tree_entry_name(entry));
 
-      /* TOOD: Check that the blob <-> path mapping is 1-1. */
       g_hash_table_insert(paths, (gpointer)sha1, (gpointer)path);
-      g_hash_table_insert(blobs, (gpointer)sha1, (gpointer)data);
-
-      ctx->bytes += (unsigned long)(sizeof(char) * strlen(data));
 
       sha1_refs = malloc(sizeof(char*) * total_refs);
       assert(sha1_refs != NULL);
@@ -191,8 +191,6 @@ static int mne_git_get_tag_tree(git_tree **tag_tree, git_reference **tag_ref, co
 }
 
 static void mne_git_walk_tree(git_tree *tree, git_reference *ref, mne_git_walk_ctx *ctx) {
-  ctx->distinct_blobs = 0;
-
   int ref_name_len = strlen(git_reference_name(ref));
   ctx->ref_name = malloc(sizeof(char) * (ref_name_len + 1));
   assert(ctx->ref_name != NULL);
@@ -203,13 +201,17 @@ static void mne_git_walk_tree(git_tree *tree, git_reference *ref, mne_git_walk_c
 
   printf(" * %-22s", ctx->ref_name);
   fflush(stdout);
+  unsigned int blobs_before = total_blobs;
   git_tree_walk(tree, &mne_git_tree_entry_cb, GIT_TREEWALK_POST, ctx);
-  printf(" ✔ +%d\n", ctx->distinct_blobs);
+  printf(" ✔ +%d\n", total_blobs - blobs_before);
 }
 
 static void mne_git_initialize() {
+  data = NULL;
+  blob_index = NULL;
+  data_size = 0;
   total_refs = 0;
-  blobs = g_hash_table_new(g_str_hash, g_str_equal);
+  total_blobs = 0;
   paths = g_hash_table_new(g_str_hash, g_str_equal);
   refs = g_hash_table_new(g_str_hash, g_str_equal);  
 }
