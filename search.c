@@ -30,7 +30,7 @@ static void *mne_search(void*);
 static void mne_search_ready();
 static void mne_search_initialize();
 static void mne_search_build_index();
-static void mne_search_print_results();
+static int mne_search_print_results();
 static void mne_search_index_iter(gpointer, gpointer, gpointer);
 
 void mne_search_cleanup() {
@@ -105,8 +105,8 @@ void mne_search_loop() {
     mne_search_ready();
     pthread_mutex_lock(&all_done_mutex);
     gettimeofday(&end, NULL);
-    mne_search_print_results();
-    printf("Done, ");
+    int total = mne_search_print_results();
+    printf("%d matches. ", total);
     mne_print_duration(&end, &begin);
     printf(".\n");
 
@@ -176,14 +176,15 @@ static void mne_search_index_iter(gpointer key, gpointer value, gpointer user_da
   ctx->offset++;
 }
 
-static void mne_search_print_results() {
-  int i, n;
+static int mne_search_print_results() {
+  int i, n, total_results = 0;
   for (i = 0; i < num_cores; i++) {
     for (n = 0; n < MAX_SEARCH_RESULTS_PER_THREAD; n++) {
       mne_search_result result = search_results[i][n];
       if (result.fresh == 0)
         break;
 
+      total_results++;
       char *sha1 = sha1_index[result.sha1_offset];
       char *path = (char*)g_hash_table_lookup(paths, sha1);
       int pad_left = 0, pad_right = 0;
@@ -224,6 +225,8 @@ static void mne_search_print_results() {
         pad_right, blob_index[result.sha1_offset] + result.offset + result.length);
     }
   }
+
+  return total_results;
 }
 
 static void *mne_search(void *_ctx) {
