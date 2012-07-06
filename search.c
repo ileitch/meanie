@@ -129,17 +129,15 @@ static void mne_search_initialize() {
 
   int i, n;
   for (i = 0; i < num_cores; i++) {
-    if (i == 0) {
       search_windows[i].begin = blob_index + (i * window_size);
-    } else {
-      search_windows[i].begin = blob_index + (i * window_size) + 1;
-    }
 
     if (i == num_cores - 1) {
-      search_windows[i].end = blob_index + (i * window_size) + last_window_size;  
+      search_windows[i].end = blob_index + (i * window_size) + last_window_size -1;  
     } else {
-      search_windows[i].end = blob_index + (i * window_size) + window_size;  
+      search_windows[i].end = blob_index + (i * window_size) + window_size -1;  
     }
+
+    printf("%ld - %ld\n", search_windows[i].begin->offset, search_windows[i].end->offset + search_windows[i].end->length);
 
     search_results[i] = malloc(sizeof(mne_search_result) * MAX_SEARCH_RESULTS_PER_THREAD);
     assert(search_results[i] != NULL);
@@ -212,7 +210,8 @@ static void mne_search_initialize() {
 // }
 
 static void *mne_search(void *_ctx) {
-  int rc, i, matches[MAX_SEARCH_RESULTS_PER_THREAD];
+  int i, rc, num_results, matches[30];
+  unsigned long offset, begin, length;
   mne_search_ctx *ctx = (mne_search_ctx *)_ctx;
   mne_search_result *results = search_results[ctx->id];
   mne_search_window window = search_windows[ctx->id];
@@ -225,32 +224,37 @@ static void *mne_search(void *_ctx) {
     if (exiting)
       break;
 
-    unsigned int begin = window.begin->offset;
-    unsigned int length = (window.end->offset + window.end->length) - begin;
-    
-    printf("%ld - %ld\n", window.begin->offset, window.end->offset + window.end->length);
+    num_results = 0;
+    offset = 0;
+    begin = window.begin->offset;
+    length = (window.end->offset + window.end->length) - begin;
 
-    rc = pcre_exec(re, re_extra, data + begin, length, 0, 0, matches, MAX_SEARCH_RESULTS_PER_THREAD);
+    while (1) {
+      rc = pcre_exec(re, re_extra, data + begin, length, offset, 0, matches, 30);
 
-    if (rc == 0)
-      mne_printf_async("Too many matches in range %ld - %ld (> %d).\n", begin, end, MAX_SEARCH_RESULTS_PER_THREAD);
+      if (rc == 0)
+        mne_printf_async("Too many captured substrings.\n");
 
-    if (rc > 0) {
-      for (i = 0; i < rc; ++i) {
-        printf("%.*s\n", matches[2*i+1] - matches[2*i], data + matches[2*i]);
-        // printf(".");
-        results[i].fresh = 1;
-        // results[i].sha1_offset = n;
-        results[i].offset = matches[2*i];
-        results[i].length = matches[2*i+1] - matches[2*i];
+      if (rc > 0) {
+        num_results++;
+        for (i = 0; i < rc; i++) {
+          
+          results[i].fresh = 1;
+          // results[i].sha1_offset = n;
+          results[i].offset = matches[2*i];
+          results[i].length = matches[2*i+1] - matches[2*i];
+
+          offset = matches[2*i] + (matches[2*i+1] - matches[2*i]);
+        }
+      } else {
+        break;
       }
 
-      rc = 0;
+      /* Mark the next result as unfresh so the main threads knows how many results we found. */
     }
 
-    /* Mark the next result as unfresh so the main threads knows how many results we found. */
-    if (rc < MAX_SEARCH_RESULTS_PER_THREAD)
-      results[rc].fresh = 0;
+    if (num_results < MAX_SEARCH_RESULTS_PER_THREAD)
+      results[num_results].fresh = 0;
 
     pthread_mutex_lock(&done_incr_mutex);
     threads_complete++;
