@@ -5,6 +5,7 @@
 
 #include "util.h"
 #include "git.h"
+#include "common.h"
 
 static git_odb *odb;
 static git_repository *repo;
@@ -78,7 +79,7 @@ static int mne_git_tree_entry_cb(const char *root, git_tree_entry *entry, void *
   mne_git_walk_ctx *ctx = (mne_git_walk_ctx*)arg;
   git_otype type = git_tree_entry_type(entry);
   
-  if (type == GIT_OBJ_BLOB) {
+  if (likely(type == GIT_OBJ_BLOB)) {
     const git_oid *blob_oid = git_tree_entry_id(entry);
     char *sha1 = malloc(sizeof(char) * GIT_OID_HEXSZ + 1);
     assert(sha1 != NULL);

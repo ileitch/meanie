@@ -8,6 +8,7 @@
 #include "util.h"
 #include "git.h"
 #include "search.h"
+#include "common.h"
 
 static pthread_t *threads;
 static pthread_cond_t search_cond = PTHREAD_COND_INITIALIZER;
@@ -226,7 +227,7 @@ static void mne_search_print_results() {
 }
 
 static void *mne_search(void *_ctx) {
-  int rc, i, num_results, n, matches[MAX_MATCHES_PER_BLOB];
+  int rc, i, num_results, n, matches[MAX_CAPTURES], offset;
   mne_search_ctx *ctx = (mne_search_ctx *)_ctx;
   mne_search_result *results = search_results[ctx->initial];
 
@@ -241,38 +242,53 @@ static void *mne_search(void *_ctx) {
     num_results = 0;
 
     for (n = ctx->initial; n < ctx->num_blobs; n += num_cores) {
-      rc = pcre_exec(re, re_extra, blob_index[n], blob_sizes[n], 0, 0, matches, MAX_MATCHES_PER_BLOB);
+      offset = 0;
 
-      if (rc == 0)
-        mne_printf_async("Too many matches in blob %s (> %d).\n", sha1_index[n], MAX_MATCHES_PER_BLOB);
+      while (1) {
+        rc = pcre_exec(re, re_extra, blob_index[n], blob_sizes[n], offset, 0, matches, MAX_CAPTURES);
 
-      for (i = 0; i < rc; ++i) {
-        results[num_results].fresh = 1;
-        results[num_results].sha1_offset = n;
-        results[num_results].offset = matches[2*i];
-        results[num_results].length = matches[2*i+1] - matches[2*i];
-        
-        if (num_results == MAX_SEARCH_RESULTS_PER_THREAD)
+        if (unlikely(rc == 0)) {
+          mne_printf_async("Too many captured substrings in blob %s (> %d).\n", sha1_index[n], MAX_CAPTURES);
+          continue;          
+        }
+
+        if (rc > 0) {
+          for (i = 0; i < rc; ++i) {
+            // TODO: These are captured substrings, they should all be part of the same result.
+            results[num_results].fresh = 1;
+            results[num_results].sha1_offset = n;
+            results[num_results].offset = matches[2*i];
+            results[num_results].length = matches[2*i+1] - matches[2*i];
+
+            if (unlikely(num_results == MAX_SEARCH_RESULTS_PER_THREAD))
+              break;
+
+            offset = matches[2*i] + (matches[2*i+1] - matches[2*i]);
+            num_results++;        
+          }    
+        } else {
           break;
+        }
 
-        num_results++;        
+        if (unlikely(num_results == MAX_SEARCH_RESULTS_PER_THREAD))
+          break;
       }
 
-      if (num_results == MAX_SEARCH_RESULTS_PER_THREAD) {
-          printf("Thread %d has reached maximum result count (%d).", ctx->initial, MAX_SEARCH_RESULTS_PER_THREAD);
-          break;
+      if (unlikely(num_results == MAX_SEARCH_RESULTS_PER_THREAD)) {
+        printf("Thread %d has reached maximum result count (%d).\n", ctx->initial, MAX_SEARCH_RESULTS_PER_THREAD);
+        break;
       }
     }
+
+    /* Mark the next result as unfresh so the main threads knows how many results we found. */
+    if (num_results < MAX_SEARCH_RESULTS_PER_THREAD)
+      results[num_results].fresh = 0;
     
     pthread_mutex_lock(&done_incr_mutex);
     threads_complete++;
     if (threads_complete == num_cores)
       pthread_mutex_unlock(&all_done_mutex);
     pthread_mutex_unlock(&done_incr_mutex);
-
-    /* Mark the next result as unfresh so the main threads knows how many results we found. */
-    if (num_results < MAX_SEARCH_RESULTS_PER_THREAD)
-      results[num_results].fresh = 0;
   }
 
   pthread_exit(NULL);
