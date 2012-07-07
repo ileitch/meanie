@@ -106,6 +106,8 @@ void mne_search_loop() {
     pthread_mutex_lock(&all_done_mutex);
     gettimeofday(&end, NULL);
     int total = mne_search_print_results();
+    if (total == MAX_SEARCH_RESULTS_PER_THREAD * num_cores)
+      printf("Hit match limit!\n");
     printf("%d matches. ", total);
     mne_print_duration(&end, &begin);
     printf(".\n");
