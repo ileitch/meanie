@@ -2,7 +2,7 @@
 
 #define RESULT_PAD 20
 #define MAX_CAPTURES 30
-#define MAX_SEARCH_RESULTS_PER_THREAD 1000
+#define MAX_SEARCH_RESULTS_PER_THREAD 10000
 
 typedef struct {
 	unsigned int initial;
